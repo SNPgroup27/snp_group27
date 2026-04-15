@@ -22,17 +22,19 @@ _ABNORMAL_LEVELS = frozenset(("LOW", "HIGH"))
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS glucose_readings (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    patient_id    TEXT  NOT NULL,
-    device_id     TEXT,
-    timestamp     TEXT  NOT NULL,
-    glucose_mmol  REAL  NOT NULL,
-    alert_level   TEXT  NOT NULL,
-    received_at   TEXT  NOT NULL,
-    latency_ms    REAL  NOT NULL
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id           TEXT  NOT NULL,
+    device_id            TEXT,
+    timestamp            TEXT  NOT NULL,
+    glucose_mmol         REAL  NOT NULL,
+    device_alert_level   TEXT  NOT NULL,
+    gateway_alert_level  TEXT  NOT NULL,
+    alert_mismatch       INTEGER NOT NULL,
+    received_at          TEXT  NOT NULL,
+    latency_ms           REAL  NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_patient ON glucose_readings(patient_id);
-CREATE INDEX IF NOT EXISTS idx_alert   ON glucose_readings(alert_level);
+CREATE INDEX IF NOT EXISTS idx_alert   ON glucose_readings(gateway_alert_level);
 """
 
 
@@ -106,6 +108,15 @@ def _latency_ms(packet_timestamp: str, received_at: str) -> float:
     received = _parse_iso_datetime(received_at)
     latency = round((received - sent_at).total_seconds() * 1000, 3)
     return max(latency, 0.0)
+
+
+def _derive_alert_level(glucose_mmol: float) -> str:
+    """Derive the gateway alert level from glucose mmol/L."""
+    if glucose_mmol < 3.9:
+        return "LOW"
+    if glucose_mmol <= 10.0:
+        return "NORMAL"
+    return "HIGH"
 
 
 class APIGateway:
@@ -193,17 +204,22 @@ class APIGateway:
         row_id: int,
         patient_id: str,
         glucose: float,
-        level: str,
+        device_alert: str,
+        gateway_alert: str,
+        mismatch: int,
         ts: str,
         received_at: str,
         latency_ms: float,
     ) -> None:
         self._alert_log.warning(
-            "alert row_id=%d level=%s patient=%s glucose=%.1f ts=%s received_at=%s latency_ms=%.3f",
+            "alert row_id=%d patient=%s glucose=%.1f device_alert=%s gateway_alert=%s mismatch=%d "
+            "ts=%s received_at=%s latency_ms=%.3f",
             row_id,
-            level,
             patient_id,
             glucose,
+            device_alert,
+            gateway_alert,
+            mismatch,
             ts,
             received_at,
             latency_ms,
@@ -231,19 +247,26 @@ class APIGateway:
 
             received_at = _utc_now_iso()
             try:
+                glucose_mmol = float(data["glucose_mmol"])
+                device_alert = str(data["alert_level"])
+                gateway_alert = _derive_alert_level(glucose_mmol)
+                alert_mismatch = int(device_alert != gateway_alert)
                 latency_ms = _latency_ms(data["timestamp"], received_at)
                 with self._db() as conn:
                     cursor = conn.execute(
                         """INSERT INTO glucose_readings
                                (patient_id, device_id, timestamp,
-                                glucose_mmol, alert_level, received_at, latency_ms)
-                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                                glucose_mmol, device_alert_level, gateway_alert_level,
+                                alert_mismatch, received_at, latency_ms)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             data["patient_id"],
                             data.get("device_id"),
                             data["timestamp"],
-                            data["glucose_mmol"],
-                            data["alert_level"],
+                            glucose_mmol,
+                            device_alert,
+                            gateway_alert,
+                            alert_mismatch,
                             received_at,
                             latency_ms,
                         ),
@@ -251,26 +274,41 @@ class APIGateway:
                     row_id = cursor.lastrowid
 
                 self._req_log.info(
-                    "gateway stored id=%d patient=%s glucose=%.1f alert=%s received_at=%s latency_ms=%.3f",
+                    "gateway stored id=%d patient=%s glucose=%.1f device_alert=%s gateway_alert=%s "
+                    "mismatch=%d received_at=%s latency_ms=%.3f",
                     row_id,
                     data["patient_id"],
-                    data["glucose_mmol"],
-                    data["alert_level"],
+                    glucose_mmol,
+                    device_alert,
+                    gateway_alert,
+                    alert_mismatch,
                     received_at,
                     latency_ms,
                 )
-                if data["alert_level"] in _ABNORMAL_LEVELS:
+                if alert_mismatch:
+                    self._req_log.warning(
+                        "gateway alert_mismatch id=%d patient=%s glucose=%.1f device_alert=%s gateway_alert=%s",
+                        row_id,
+                        data["patient_id"],
+                        glucose_mmol,
+                        device_alert,
+                        gateway_alert,
+                    )
+
+                if gateway_alert in _ABNORMAL_LEVELS:
                     self._req_log.warning(
                         "gateway abnormal level=%s patient=%s glucose=%.1f",
-                        data["alert_level"],
+                        gateway_alert,
                         data["patient_id"],
-                        data["glucose_mmol"],
+                        glucose_mmol,
                     )
                     self._log_alert(
                         row_id,
                         data["patient_id"],
-                        data["glucose_mmol"],
-                        data["alert_level"],
+                        glucose_mmol,
+                        device_alert,
+                        gateway_alert,
+                        alert_mismatch,
                         data["timestamp"],
                         received_at,
                         latency_ms,
