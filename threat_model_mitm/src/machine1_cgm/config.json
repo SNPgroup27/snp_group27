@@ -1,6 +1,5 @@
 {
-  "api_endpoint": "http://192.168.1.1:5050/api/glucose",
-  "interval_seconds": 300,
+  "interval_seconds": 5,
   "loop": true,
-  "packet_file": "../../data/cgm_packets_normal/U001_packets.json"
+  "packet_file": "../../data/cgm_packets_test/test_payload.json"
 }

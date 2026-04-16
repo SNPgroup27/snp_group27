@@ -72,8 +72,6 @@ def _load_runtime_config() -> dict[str, Any]:
         if not database_path.is_absolute():
             database_path = (GATEWAY_CONFIG_FILE.parent / database_path).resolve()
 
-        api_endpoint = str(cgm_config["api_endpoint"])
-        default_remote_ip = api_endpoint.split("//", 1)[-1].split(":", 1)[0].split("/", 1)[0]
     except KeyError as exc:
         raise RuntimeError(f"Missing required config key: {exc}") from exc
 
@@ -85,7 +83,6 @@ def _load_runtime_config() -> dict[str, Any]:
         "interval_seconds": float(cgm_config.get("interval_seconds", DEFAULT_CGM_INTERVAL_SECONDS)),
         "loop": bool(cgm_config.get("loop", DEFAULT_CGM_LOOP)),
         "packet_file": packet_file,
-        "default_remote_ip": default_remote_ip,
     }
 
 
@@ -224,7 +221,7 @@ def _parse_args(runtime_config: dict[str, Any]) -> argparse.Namespace:
         default=None,
         help=(
             "IP address of the gateway. "
-            "Defaults to '127.0.0.1' in single mode or the config endpoint host in cgm mode."
+            "Required in cgm mode and ignored in single mode."
         ),
     )
     parser.add_argument(
@@ -265,7 +262,7 @@ if __name__ == "__main__":
     if args.gateway_ip:
         gw_ip = args.gateway_ip
     elif mode is Workflow.Mode.CGM:
-        gw_ip = runtime_config["default_remote_ip"]
+        raise SystemExit("--gateway-ip is required in cgm mode")
     else:
         gw_ip = "127.0.0.1"
 
