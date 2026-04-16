@@ -4,7 +4,7 @@
 
 Use this on **your own** machine or VM when you are allowed to capture traffic for coursework.
 
-This project generates **normal** HTTP traffic: the fake IoMT client (`iomt_client.py`) sends **POST** appointment requests to the simulated datacenter (`uvicorn` on port **8000** by default).
+This project generates **normal** HTTP traffic: the fake IoMT client (`iomt_client.py`) sends **POST** requests to the simulated datacenter (`uvicorn` on port **8000** by default).
 
 ## Where to capture
 

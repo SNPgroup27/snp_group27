@@ -1,4 +1,4 @@
-# Simulated datacenter + IoMT (appointments only coursework prototype)
+# Simulated datacenter + IoMT (coursework prototype)
 
 This repo is a **small prototype** of a hospital-style **datacenter API** receiving\n**appointment booking requests** from a **fake IoMT client**.\n\nThe appointment payloads are built from the Kaggle\n`hospital-management-dataset` (`appointments.csv`) and replayed\ntowards the API. All interaction is via the **terminal** — no browser or UI is required.
 
