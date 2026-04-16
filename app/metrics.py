@@ -1,4 +1,4 @@
-"""In-process request metrics for demon"""
+"""In-process request metrics for demo"""
 
 from __future__ import annotations
 

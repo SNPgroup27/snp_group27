@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
-Simulated IoMT device (CGM-style): posts telemetry to the datacenter on an interval.
+Simulated IoMT device: replays hospital appointments to the datacenter API.
 
+Each request is built from data/appointments.csv via appointments_datastream.py
+and sent to POST /api/appointments on the server.
+
+This used to send random CGM readings; now it sends appointment bookings instead.
 """
 
 from __future__ import annotations
@@ -13,9 +17,9 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from cgm_datastream import random_cgm_reading
+from appointments_datastream import next_appointment
 
-DEFAULT_PATH = "/api/cgm/readings"
+DEFAULT_PATH = "/api/appointments"
 
 
 @dataclass
@@ -48,21 +52,26 @@ def run_worker(
     stats: WorkerStats,
     print_each: bool,
 ) -> None:
-    device_id = f"sim-cgm-{wid}"
+    device_label = f"sim-appointments-client-{wid}"
     url = base_url.rstrip("/") + path
     with httpx.Client(timeout=timeout_s) as client:
         while not stop.is_set():
-            payload = random_cgm_reading(device_id)
+            payload = next_appointment()
             try:
                 r = client.post(url, json=payload)
                 if r.status_code < 400:
                     stats.add_ok()
                     if print_each:
-                        g = payload["glucose_mg_dl"]
-                        ts = payload.get("timestamp", "")
+                        appt_id = payload.get("appointment_id")
+                        patient = payload.get("patient_id")
+                        doctor = payload.get("doctor_id")
+                        date = payload.get("appointment_date")
+                        time_str = payload.get("appointment_time")
                         print(
-                            f"[IoMT → datacenter] device={device_id} "
-                            f"glucose_mg_dl={g} timestamp={ts}",
+                            "[Appointments → datacenter] "
+                            f"client={device_label} appointment_id={appt_id} "
+                            f"patient={patient} doctor={doctor} "
+                            f"date={date} time={time_str}",
                             flush=True,
                         )
                 else:
@@ -82,7 +91,7 @@ def run_worker(
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Simulated CGM / IoMT telemetry client (terminal output; no browser needed)."
+        description="Simulated IoMT appointments client (terminal output; no browser needed)."
     )
     p.add_argument("--base-url", default="http://127.0.0.1:8000", help="Datacenter base URL")
     p.add_argument("--path", default=DEFAULT_PATH, help="CGM ingest path")
