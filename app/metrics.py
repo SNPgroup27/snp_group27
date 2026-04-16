@@ -1,4 +1,4 @@
-"""In-process request metrics for demo"""
+"""In-process request metrics for demo."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from typing import Deque
 class ServerMetrics:
     request_count: int = 0
     error_count: int = 0
-    cgm_posts: int = 0
+    appointment_posts: int = 0
     _latencies_ms: Deque[float] = field(default_factory=lambda: deque(maxlen=2000))
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -24,16 +24,16 @@ class ServerMetrics:
                 self.error_count += 1
             self._latencies_ms.append(latency_ms)
 
-    def record_cgm_post(self) -> None:
+    def record_appointment_post(self) -> None:
         with self._lock:
-            self.cgm_posts += 1
+            self.appointment_posts += 1
 
     def snapshot(self) -> dict:
         with self._lock:
             lat = list(self._latencies_ms)
             req = self.request_count
             err = self.error_count
-            posts = self.cgm_posts
+            posts = self.appointment_posts
         lat_sorted = sorted(lat)
         n = len(lat_sorted)
 
@@ -47,7 +47,7 @@ class ServerMetrics:
             "uptime_s": _uptime_s(),
             "request_count": req,
             "error_count": err,
-            "cgm_posts": posts,
+            "appointment_posts": posts,
             "latency_ms": {
                 "p50": pct(0.50),
                 "p95": pct(0.95),

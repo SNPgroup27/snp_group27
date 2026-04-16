@@ -4,7 +4,7 @@
 
 Use this on **your own** machine or VM when you are allowed to capture traffic for coursework.
 
-This project generates **normal** HTTP traffic: the fake IoMT client (`iomt_client.py`) sends **POST** requests to the simulated datacenter (`uvicorn` on port **8000** by default).
+This project generates **normal** HTTP traffic: the fake IoMT client (`iomt_client.py`) sends **POST** appointment requests to the simulated datacenter (`uvicorn` on port **8000** by default).
 
 ## Where to capture
 
@@ -28,7 +28,7 @@ Replace `x.x.x.x` with the IP of the machine running the API (often `127.0.0.1`)
 ## What you should see
 
 - **TCP handshake** (SYN, SYN-ACK, ACK) then **HTTP** requests.
-- **POST** to `/api/cgm/readings` with JSON containing `device_id`, `glucose_mg_dl`, and `timestamp` (from [`cgm_datastream.py`](cgm_datastream.py)).
+- **POST** to `/api/appointments` with JSON containing `appointment_id`, `patient_id`, `doctor_id`, `appointment_date`, `appointment_time`, and related fields (from [`appointments_datastream.py`](appointments_datastream.py)).
 
 Right‑click a packet → **Follow** → **TCP Stream** or **HTTP Stream** to view the full request/response for your report.
 
@@ -36,7 +36,7 @@ Right‑click a packet → **Follow** → **TCP Stream** or **HTTP Stream** to v
 
 | In Wireshark | In this repo |
 |--------------|----------------|
-| POST body with CGM JSON | [`cgm_datastream.random_cgm_reading`](cgm_datastream.py) + [`iomt_client.py`](iomt_client.py) |
+| POST body with appointment JSON | [`appointments_datastream.next_appointment`](appointments_datastream.py) + [`iomt_client.py`](iomt_client.py) |
 | HTTP responses from `:8000` | [`app/main.py`](app/main.py) |
 
 ## Export for reports

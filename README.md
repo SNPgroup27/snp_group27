@@ -1,4 +1,4 @@
-# Simulated datacenter + IoMT (coursework prototype)
+# Simulated datacenter + IoMT (appointments only coursework prototype)
 
 This repo is a **small prototype** of a hospital-style **datacenter API** receiving\n**appointment booking requests** from a **fake IoMT client**.\n\nThe appointment payloads are built from the Kaggle\n`hospital-management-dataset` (`appointments.csv`) and replayed\ntowards the API. All interaction is via the **terminal** — no browser or UI is required.
 
@@ -6,7 +6,7 @@ This repo is a **small prototype** of a hospital-style **datacenter API** receiv
 
 | Piece | Role |
 |--------|------|
-| [`app/main.py`](app/main.py) | FastAPI **server**: ingest CGM JSON (legacy), **appointments**, `/health`, `/api/metrics` |
+| [`app/main.py`](app/main.py) | FastAPI **server**: ingest **appointments**, `/health`, `/api/metrics` |
 | [`app/metrics.py`](app/metrics.py) | In-process **request latency** and counters |
 | [`appointments_datastream.py`](appointments_datastream.py) | Appointment datastream built from `data/appointments.csv` |
 | [`iomt_client.py`](iomt_client.py) | **Fake IoMT client**: POST appointment bookings on an interval; **prints each message** to the terminal |
@@ -75,7 +75,7 @@ conda activate snp_lab   # or: source .venv/bin/activate
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
-You should see a line like `[datacenter] accepted CGM reading device=… glucose_mg_dl=…` each time a reading arrives.
+You should see lines like `[datacenter] accepted appointment id=… patient=… doctor=… date=… time=…` as requests arrive.
 
 **Terminal 2 — fake IoMT appointments client** (sends one booking every **5** seconds by default):
 
@@ -107,7 +107,6 @@ curl -s http://127.0.0.1:8000/api/appointments | python -m json.tool
 | `GET` | `/api/metrics` | Request counts, errors, latency percentiles |
 | `POST` | `/api/appointments` | Ingest appointment JSON (schema from `appointments.csv`) |
 | `GET` | `/api/appointments` | Last N appointments |
-| `POST` | `/api/cgm/readings` | Legacy CGM ingest (used earlier in the project) |
 
 ## Further reading
 

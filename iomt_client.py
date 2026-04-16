@@ -4,8 +4,6 @@ Simulated IoMT device: replays hospital appointments to the datacenter API.
 
 Each request is built from data/appointments.csv via appointments_datastream.py
 and sent to POST /api/appointments on the server.
-
-This used to send random CGM readings; now it sends appointment bookings instead.
 """
 
 from __future__ import annotations
@@ -94,7 +92,7 @@ def main() -> None:
         description="Simulated IoMT appointments client (terminal output; no browser needed)."
     )
     p.add_argument("--base-url", default="http://127.0.0.1:8000", help="Datacenter base URL")
-    p.add_argument("--path", default=DEFAULT_PATH, help="CGM ingest path")
+    p.add_argument("--path", default=DEFAULT_PATH, help="Appointments ingest path")
     p.add_argument(
         "--interval",
         type=float,
@@ -135,7 +133,7 @@ def main() -> None:
         t.start()
 
     print(
-        "Fake IoMT client running. Each line is one POST of fake CGM data to the server.",
+        "Fake IoMT client running. Each line is one POST of an appointment to the server.",
         "Press Ctrl+C to stop.\n",
         flush=True,
     )
