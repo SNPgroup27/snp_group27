@@ -6,8 +6,7 @@ Packet files are derived from the GlucoBench benchmark dataset:
   - Alert levels: LOW (<3.9 mmol/L), NORMAL (3.9-10.0), HIGH (>10.0).
   - Runtime packet timestamps are injected at send time.
 
-Run directly from this folder with ``python3 cgm_simulator.py`` or launch the
-combined workflow from ``python3 ../main_cgm_api.py --mode``.
+Launch the simulator via ``python3 ../main_cgm_api.py --mode``
 """
 
 import json
@@ -96,22 +95,6 @@ class CGMSimulator:
             len(self._trace),
         )
         self._log.info("cgm endpoint=%s", api_endpoint)
-
-    @classmethod
-    def from_config(cls, config_path: Path = CONFIG_FILE) -> "CGMSimulator":
-        """Build a simulator instance from a config file."""
-        config = load_config(config_path)
-        packet_file = Path(config["packet_file"])
-        if not packet_file.is_absolute():
-            packet_file = (config_path.parent / packet_file).resolve()
-
-        return cls(
-            api_endpoint=config["api_endpoint"],
-            packet_file=packet_file,
-            interval_seconds=float(config["interval_seconds"]),
-            loop=bool(config.get("loop", True)),
-            mode="cgm",
-        )
 
     @staticmethod
     def _load_trace(filepath: Path) -> list[dict[str, Any]]:
@@ -212,4 +195,6 @@ if __name__ == "__main__":
         level=logging.INFO,
         format="%(levelname)s %(message)s",
     )
-    CGMSimulator.from_config(CONFIG_FILE).run()
+    raise SystemExit(
+        "Run the CGM via main_cgm_api.py"
+    )
