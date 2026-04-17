@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Any, List
 
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.metrics import METRICS
+from defence.captcha import create_challenge, verify_challenge
+
+_CAPTCHA_ENV = "ENABLE_APPOINTMENT_CAPTCHA"
+
+
+def _captcha_enabled() -> bool:
+    return os.environ.get(_CAPTCHA_ENV, "").strip().lower() in ("1", "true", "yes", "on")
 
 app = FastAPI(
     title="Simulated Hospital Datacenter",
@@ -25,6 +33,8 @@ class Appointment(BaseModel):
     appointment_time: str
     reason_for_visit: str
     status: str
+    captcha_challenge_id: str | None = None
+    captcha_answer: str | None = None
 
 
 _appointments: List[dict[str, Any]] = []
@@ -56,10 +66,30 @@ async def metrics():
     return METRICS.snapshot()
 
 
+@app.get("/api/captcha/challenge")
+async def captcha_challenge():
+    """Return a one-time math CAPTCHA (used when ENABLE_APPOINTMENT_CAPTCHA is set)."""
+    return create_challenge()
+
+
 @app.post("/api/appointments")
 async def post_appointment(appt: Appointment):
     """Accept one appointment booking request."""
-    _appointments.append(appt.model_dump())
+    if _captcha_enabled():
+        cid = appt.captcha_challenge_id
+        ans = appt.captcha_answer
+        if not cid or ans is None or str(ans).strip() == "":
+            raise HTTPException(
+                status_code=400,
+                detail="captcha_challenge_id and captcha_answer required when CAPTCHA is enabled",
+            )
+        if not verify_challenge(cid, ans):
+            raise HTTPException(status_code=403, detail="invalid or expired CAPTCHA")
+
+    row = appt.model_dump()
+    row.pop("captcha_challenge_id", None)
+    row.pop("captcha_answer", None)
+    _appointments.append(row)
     if len(_appointments) > _MAX_APPOINTMENTS:
         del _appointments[: len(_appointments) - _MAX_APPOINTMENTS]
     print(

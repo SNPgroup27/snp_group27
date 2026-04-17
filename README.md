@@ -10,6 +10,7 @@ This repo is a **small prototype** of a hospital-style **datacenter API** receiv
 | [`app/metrics.py`](app/metrics.py) | In-process **request latency** and counters |
 | [`appointments_datastream.py`](appointments_datastream.py) | Appointment datastream built from `data/appointments.csv` |
 | [`iomt_client.py`](iomt_client.py) | **Fake IoMT client**: POST appointment bookings on an interval; **prints each message** to the terminal |
+| [`defence/`](defence/) | **Mitigations**: SYN cookies (kernel; script + docs), **CAPTCHA** on `POST /api/appointments` when enabled — see [`defence/README.md`](defence/README.md) |
 
 ## Prerequisites
 
@@ -99,6 +100,11 @@ curl -s http://127.0.0.1:8000/api/appointments | python -m json.tool
 
 **Optional — Wireshark** (not required to see data): see [WIRESHARK.md](WIRESHARK.md).
 
+### Defences (Coursework 2)
+
+- **SYN cookies (Linux server):** [`defence/syn_cookies.sh`](defence/syn_cookies.sh) — e.g. `sudo ./defence/syn_cookies.sh on` after insecure-lab demos. Details: [`defence/README.md`](defence/README.md).
+- **CAPTCHA on appointments:** set `ENABLE_APPOINTMENT_CAPTCHA=1` when starting uvicorn, then use `python iomt_client.py --use-captcha` for legitimate traffic. HTTP flood scripts that do not solve CAPTCHA will get **403**.
+
 ## API summary
 
 | Method | Path | Purpose |
@@ -106,6 +112,7 @@ curl -s http://127.0.0.1:8000/api/appointments | python -m json.tool
 | `GET` | `/health` | Liveness |
 | `GET` | `/api/metrics` | Request counts, errors, latency percentiles |
 | `POST` | `/api/appointments` | Ingest appointment JSON (schema from `appointments.csv`) |
+| `GET` | `/api/captcha/challenge` | One-time math CAPTCHA (when `ENABLE_APPOINTMENT_CAPTCHA=true`) |
 | `GET` | `/api/appointments` | Last N appointments |
 
 ## Further reading
