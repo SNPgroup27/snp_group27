@@ -131,6 +131,7 @@ class APIGateway:
         host: str = "0.0.0.0",
         port: int = 5050,
         db_path: Path = _BASE / "hospital.db",
+        reset_database_on_start: bool = True,
         debug: bool = False,
         mode: str = "gateway",
     ) -> None:
@@ -139,12 +140,14 @@ class APIGateway:
             host:    Flask bind address.
             port:    Flask bind port.
             db_path: Path to the SQLite database file (created if absent).
+            reset_database_on_start: Whether to delete the runtime DB on startup.
             debug:   Enable Flask debug mode.
             mode:    Workflow mode label for logging context.
         """
         self._host = host
         self._port = port
         self._db_path = Path(db_path).resolve()
+        self._reset_database_on_start = reset_database_on_start
         self._debug = debug
         self._mode = mode
 
@@ -174,6 +177,7 @@ class APIGateway:
             host=config.get("host", "0.0.0.0"),
             port=int(config.get("port", 5050)),
             db_path=db_path,
+            reset_database_on_start=bool(config.get("reset_database_on_start", True)),
             debug=bool(config.get("debug", False)),
             mode="gateway",
         )
@@ -182,6 +186,9 @@ class APIGateway:
 
     def _reset_database(self) -> None:
         """Reset the runtime database file on startup."""
+        if not self._reset_database_on_start:
+            self._req_log.info("gateway preserve existing database path=%s", self._db_path)
+            return
         if self._db_path.exists():
             self._db_path.unlink()
             self._req_log.warning("gateway reset existing database path=%s", self._db_path)

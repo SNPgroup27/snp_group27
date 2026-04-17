@@ -79,6 +79,7 @@ def _load_runtime_config() -> dict[str, Any]:
         "gateway_host": gateway_config.get("host", DEFAULT_GATEWAY_HOST),
         "gateway_port": int(gateway_config.get("port", DEFAULT_GATEWAY_PORT)),
         "gateway_debug": bool(gateway_config["debug"]),
+        "reset_database_on_start": bool(gateway_config.get("reset_database_on_start", True)),
         "database_path": database_path,
         "interval_seconds": float(cgm_config.get("interval_seconds", DEFAULT_CGM_INTERVAL_SECONDS)),
         "loop": bool(cgm_config.get("loop", DEFAULT_CGM_LOOP)),
@@ -103,6 +104,7 @@ class Workflow:
         gateway_host: str = DEFAULT_GATEWAY_HOST,
         gateway_port: int = DEFAULT_GATEWAY_PORT,
         gateway_debug: bool = False,
+        reset_database_on_start: bool = True,
         database_path: Path = DEFAULT_DATABASE_PATH,
         packet_file: Path | None = None,
     ) -> None:
@@ -116,6 +118,8 @@ class Workflow:
             gateway_host:      Gateway bind host loaded from gateway config.
             gateway_port:      Gateway port loaded from gateway config.
             gateway_debug:     Gateway debug flag loaded from gateway config.
+            reset_database_on_start:
+                               Whether the gateway should reset its DB on start.
             database_path:     Gateway database path loaded from gateway config.
             packet_file:       CGM packet file path loaded from CGM config.
         """
@@ -126,6 +130,7 @@ class Workflow:
         self._gateway_host = gateway_host
         self._gateway_port = gateway_port
         self._gateway_debug = gateway_debug
+        self._reset_database_on_start = reset_database_on_start
         self._database_path = database_path
         self._packet_file = packet_file or DEFAULT_PACKET_FILE
         self._log = logging.getLogger("main")
@@ -135,6 +140,7 @@ class Workflow:
             host=self._gateway_host,
             port=self._gateway_port,
             db_path=self._database_path,
+            reset_database_on_start=self._reset_database_on_start,
             debug=self._gateway_debug,
             mode=self._mode.value,
         )
@@ -274,6 +280,7 @@ if __name__ == "__main__":
         gateway_host=runtime_config["gateway_host"],
         gateway_port=runtime_config["gateway_port"],
         gateway_debug=runtime_config["gateway_debug"],
+        reset_database_on_start=runtime_config["reset_database_on_start"],
         database_path=runtime_config["database_path"],
         packet_file=runtime_config["packet_file"],
     )
