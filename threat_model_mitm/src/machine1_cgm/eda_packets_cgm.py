@@ -17,6 +17,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
+# Placeholder path for offline preprocessing only, and should be run before simulator setup/worflow.
 DATASET_PATH = "./path/to/GlucoBench_benchmark_dataset.csv"
 OUTPUT_DIR = Path("./threat_model_mitm/data/cgm_packets_normal")
 REQUIRED_COLUMNS = ("glucose", "timestamp", "user_id", "device_id")
