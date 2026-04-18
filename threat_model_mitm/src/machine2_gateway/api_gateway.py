@@ -187,7 +187,8 @@ class APIGateway:
     def _reset_database(self) -> None:
         """Reset the runtime database file on startup."""
         if not self._reset_database_on_start:
-            self._req_log.info("gateway preserve existing database path=%s", self._db_path)
+            if self._db_path.exists():
+                self._req_log.info("gateway preserve existing database path=%s", self._db_path)
             return
         if self._db_path.exists():
             self._db_path.unlink()
