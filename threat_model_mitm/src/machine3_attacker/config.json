@@ -1,0 +1,37 @@
+{
+  "cgm_ip": "CHANGE",
+  "gateway_ip": "CHANGE",
+  "gateway_port": 5050,
+  "gateway_endpoint": "/api/glucose",
+  "network_interface": "CHANGE",
+  "transparent_proxy_port": 8080,
+  "enable_ip_forwarding": true,
+  "enable_arp_spoofing": true,
+  "logs": {
+    "attack_packet_map": "logs/attack_packet_map.jsonl",
+    "attack_summary": "logs/attack_summary.json",
+    "phi_exposure": "logs/phi_exposure.jsonl"
+  },
+  "tamper_policy": {
+    "LOW": {
+      "enabled": true,
+      "action": "modify",
+      "replacement_glucose_mmol": 6.8,
+      "replacement_alert_level": "NORMAL",
+      "attack_event": "low_suppression",
+      "impact": "time_critical_treatment_delay"
+    },
+    "HIGH": {
+      "enabled": true,
+      "action": "modify",
+      "replacement_glucose_mmol": 7.4,
+      "replacement_alert_level": "NORMAL",
+      "attack_event": "high_suppression",
+      "impact": "delayed_correction_suppression"
+    },
+    "NORMAL": {
+      "enabled": false,
+      "action": "forward"
+    }
+  }
+}
