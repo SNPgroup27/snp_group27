@@ -51,8 +51,9 @@ def _proxy_setup(config: AttackerConfig) -> None:
     try:
         subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         LOGGER.info("proxy_redirect_rule added")
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as exc:
         LOGGER.error("proxy_redirect_rule add failed")
+        raise RuntimeError("proxy REDIRECT rule setup failed") from exc
 
 
 def _proxy_cleanup(config: AttackerConfig) -> None:
@@ -113,7 +114,6 @@ def _parse_args() -> argparse.Namespace:
             "  sudo python3 run_attack.py --proxy-setup\n"
             "  sudo python3 run_attack.py --proxy-cleanup\n"
             "  sudo python3 run_attack.py\n"
-            "  sudo python3 run_attack.py --dry-run\n"
         ),
     )
     parser.add_argument(
@@ -121,15 +121,6 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         default=_BASE / "config.json",
         help="Path to config.json (default: ./config.json)",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        default=False,
-        help=(
-            "Show planned ARP commands without executing. "
-            "Does not start the proxy or sniffer."
-        ),
     )
     parser.add_argument(
         "--no-arp",
@@ -196,7 +187,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    """Load config, initialise components, and run the selected attack mode."""
+    """Load config, initialise components, and run the attacker workflow."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -247,7 +238,7 @@ def main() -> None:
         LOGGER.error("choose only one of --proxy-setup or --proxy-cleanup")
         sys.exit(1)
 
-    spoofer = ArpSpoofer(config, dry_run=args.dry_run)
+    spoofer = ArpSpoofer(config)
 
     if args.setup and args.cleanup:
         LOGGER.error("choose only one of --setup or --cleanup")
@@ -286,21 +277,14 @@ def main() -> None:
         return
 
     LOGGER.info(
-        "attacker_start cgm=%s gateway=%s:%d dry_run=%s no_arp=%s",
+        "attacker_start cgm=%s gateway=%s:%d no_arp=%s",
         config.cgm_ip,
         config.gateway_ip,
         config.gateway_port,
-        args.dry_run,
         args.no_arp,
     )
 
     policy = TamperPolicy(config.tamper_policy)
-
-    if args.dry_run:
-        LOGGER.info(
-            "dry_run complete. Run without --dry-run to perform setup and start the attack."
-        )
-        return
 
     evidence = EvidenceLogger(config)
     attack: TransparentProxyAttack | None = None

