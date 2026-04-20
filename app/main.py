@@ -16,6 +16,7 @@ from defence.captcha import (
     create_challenge,
     verify_challenge,
 )
+from defence.syn_cookies import syn_cookies_kernel_status
 
 _CAPTCHA_ENV = "ENABLE_APPOINTMENT_CAPTCHA"
 
@@ -74,6 +75,12 @@ async def health():
 @app.get("/api/metrics")
 async def metrics():
     return METRICS.snapshot()
+
+
+@app.get("/api/defence/syn-cookies")
+async def syn_cookies_status():
+    """Linux kernel SYN-cookie state (not configurable from Python — see defence/SYN_COOKIES.md)."""
+    return syn_cookies_kernel_status()
 
 
 @app.get("/api/captcha/challenge")

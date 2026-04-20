@@ -10,7 +10,7 @@ This repo is a **small prototype** of a hospital-style **datacenter API** receiv
 | [`app/metrics.py`](app/metrics.py) | In-process **request latency** and counters |
 | [`appointments_datastream.py`](appointments_datastream.py) | Appointment datastream built from `data/appointments.csv` |
 | [`iomt_client.py`](iomt_client.py) | **Fake IoMT client**: POST appointment bookings on an interval; **prints each message** to the terminal |
-| [`defence/`](defence/) | **Mitigations**: SYN cookies (kernel; script + docs), **CAPTCHA** on `POST /api/appointments` when enabled — see [`defence/README.md`](defence/README.md) |
+| [`defence/`](defence/) | **Mitigations**: SYN cookies (kernel; [`defence/SYN_COOKIES.md`](defence/SYN_COOKIES.md)), **CAPTCHA** + rate limit on `POST /api/appointments` when enabled |
 
 ## Prerequisites
 
@@ -102,7 +102,7 @@ curl -s http://127.0.0.1:8000/api/appointments | python -m json.tool
 
 ### Defences (Coursework 2)
 
-- **SYN cookies (Linux server):** [`defence/syn_cookies.sh`](defence/syn_cookies.sh) — e.g. `sudo ./defence/syn_cookies.sh on` after insecure-lab demos. Details: [`defence/README.md`](defence/README.md).
+- **SYN cookies (Linux kernel only):** not implemented in Python — run [`defence/syn_cookies.sh`](defence/syn_cookies.sh) on the **Linux server** (`sudo ./defence/syn_cookies.sh on`). Verify with `GET /api/defence/syn-cookies` or see [`defence/SYN_COOKIES.md`](defence/SYN_COOKIES.md).
 - **CAPTCHA on appointments:** toggle persisted state with `python defence/captcha.py --on` (or `--off`, `--status`) then run uvicorn; alternatively force with `ENABLE_APPOINTMENT_CAPTCHA=1` when starting uvicorn. Use `python iomt_client.py --use-captcha` for legitimate traffic. HTTP flood scripts that do not solve CAPTCHA will get **403**.
   When CAPTCHA defence is enabled, a built-in defence-only rate limiter also applies to appointment POSTs and returns `429` on bursts.
 
@@ -112,6 +112,7 @@ curl -s http://127.0.0.1:8000/api/appointments | python -m json.tool
 |--------|------|---------|
 | `GET` | `/health` | Liveness |
 | `GET` | `/api/metrics` | Request counts, errors, latency percentiles |
+| `GET` | `/api/defence/syn-cookies` | Linux kernel `tcp_syncookies` state (SYN-cookie defence) |
 | `POST` | `/api/appointments` | Ingest appointment JSON (schema from `appointments.csv`) |
 | `GET` | `/api/captcha/challenge` | One-time checkbox CAPTCHA token (when `ENABLE_APPOINTMENT_CAPTCHA=true`) |
 | `GET` | `/api/appointments` | Last N appointments |
