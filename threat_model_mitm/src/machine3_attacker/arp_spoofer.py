@@ -42,6 +42,10 @@ class ArpSpoofer:
 
     def disable_ip_forwarding(self) -> None:
         """Disable kernel IP forwarding."""
+        if not self._cfg.enable_ip_forwarding:
+            LOGGER.info("ip_forwarding cleanup skipped by config")
+            return
+
         if self._dry_run:
             LOGGER.info("dry_run: echo 0 > %s", _IP_FORWARD_PATH)
             return
