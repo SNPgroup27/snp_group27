@@ -50,7 +50,8 @@ def _recv_full_http_request(client_sock: socket.socket) -> bytes:
     """Read one full HTTP request using Content-Length."""
     raw = b""
 
-    # No client recv timeout is set because the lab uses a controlled CGM sender and blocking reads keep the proxy logic simple.
+    # No client recv timeout is set because the lab uses a controlled CGM sender.
+    # Blocking reads keep the proxy logic simple for this demo.
     while b"\r\n\r\n" not in raw:
         chunk = client_sock.recv(_RECV_SIZE)
         if not chunk:
