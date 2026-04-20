@@ -10,13 +10,23 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 from app.metrics import METRICS
-from defence.captcha import create_challenge, verify_challenge
+from defence.captcha import (
+    captcha_enabled,
+    check_rate_limit,
+    create_challenge,
+    verify_challenge,
+)
 
 _CAPTCHA_ENV = "ENABLE_APPOINTMENT_CAPTCHA"
 
 
 def _captcha_enabled() -> bool:
-    return os.environ.get(_CAPTCHA_ENV, "").strip().lower() in ("1", "true", "yes", "on")
+    env_val = os.environ.get(_CAPTCHA_ENV, "").strip().lower()
+    if env_val in ("1", "true", "yes", "on"):
+        return True
+    if env_val in ("0", "false", "no", "off"):
+        return False
+    return captcha_enabled()
 
 app = FastAPI(
     title="Simulated Hospital Datacenter",
@@ -68,14 +78,18 @@ async def metrics():
 
 @app.get("/api/captcha/challenge")
 async def captcha_challenge():
-    """Return a one-time math CAPTCHA (used when ENABLE_APPOINTMENT_CAPTCHA is set)."""
+    """Return a one-time checkbox CAPTCHA token."""
     return create_challenge()
 
 
 @app.post("/api/appointments")
-async def post_appointment(appt: Appointment):
+async def post_appointment(appt: Appointment, request: Request):
     """Accept one appointment booking request."""
     if _captcha_enabled():
+        client_ip = request.client.host if request.client else "unknown"
+        if not check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="rate limit exceeded")
+
         cid = appt.captcha_challenge_id
         ans = appt.captcha_answer
         if not cid or ans is None or str(ans).strip() == "":

@@ -103,7 +103,8 @@ curl -s http://127.0.0.1:8000/api/appointments | python -m json.tool
 ### Defences (Coursework 2)
 
 - **SYN cookies (Linux server):** [`defence/syn_cookies.sh`](defence/syn_cookies.sh) — e.g. `sudo ./defence/syn_cookies.sh on` after insecure-lab demos. Details: [`defence/README.md`](defence/README.md).
-- **CAPTCHA on appointments:** set `ENABLE_APPOINTMENT_CAPTCHA=1` when starting uvicorn, then use `python iomt_client.py --use-captcha` for legitimate traffic. HTTP flood scripts that do not solve CAPTCHA will get **403**.
+- **CAPTCHA on appointments:** toggle persisted state with `python defence/captcha.py --on` (or `--off`, `--status`) then run uvicorn; alternatively force with `ENABLE_APPOINTMENT_CAPTCHA=1` when starting uvicorn. Use `python iomt_client.py --use-captcha` for legitimate traffic. HTTP flood scripts that do not solve CAPTCHA will get **403**.
+  When CAPTCHA defence is enabled, a built-in defence-only rate limiter also applies to appointment POSTs and returns `429` on bursts.
 
 ## API summary
 
@@ -112,9 +113,10 @@ curl -s http://127.0.0.1:8000/api/appointments | python -m json.tool
 | `GET` | `/health` | Liveness |
 | `GET` | `/api/metrics` | Request counts, errors, latency percentiles |
 | `POST` | `/api/appointments` | Ingest appointment JSON (schema from `appointments.csv`) |
-| `GET` | `/api/captcha/challenge` | One-time math CAPTCHA (when `ENABLE_APPOINTMENT_CAPTCHA=true`) |
+| `GET` | `/api/captcha/challenge` | One-time checkbox CAPTCHA token (when `ENABLE_APPOINTMENT_CAPTCHA=true`) |
 | `GET` | `/api/appointments` | Last N appointments |
 
 ## Further reading
 
 - Observing HTTP traffic in Wireshark: [WIRESHARK.md](WIRESHARK.md)
+- HTTP flood source bind example: `python attacks/http_flood.py --target http://127.0.0.1:8000 --source-ip 127.0.0.1`

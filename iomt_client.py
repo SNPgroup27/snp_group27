@@ -16,7 +16,6 @@ from dataclasses import dataclass, field
 import httpx
 
 from appointments_datastream import next_appointment
-from defence.captcha import parse_answer_from_question
 
 DEFAULT_PATH = "/api/appointments"
 
@@ -65,15 +64,13 @@ def run_worker(
                     stop.wait(interval_s)
                     continue
                 data = ch.json()
-                q = data.get("question", "")
                 cid = data.get("challenge_id")
-                ans = parse_answer_from_question(q)
-                if cid is None or ans is None:
+                if cid is None:
                     stats.add_fail("captcha challenge parse failed", False)
                     stop.wait(interval_s)
                     continue
                 payload["captcha_challenge_id"] = cid
-                payload["captcha_answer"] = str(ans)
+                payload["captcha_answer"] = "checked"
             try:
                 r = client.post(url, json=payload)
                 if r.status_code < 400:

