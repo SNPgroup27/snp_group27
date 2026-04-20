@@ -1,20 +1,42 @@
+# OS files
 .DS_Store
-.venv/
+
+# Python cache
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-*~
-# OS files
-.DS_Store
-# Python cache and environments
 .pytest_cache/
-.python-version
+
+# Python environments
+.venv/
 env/
 venv/
 ENV/
-_build/
+snp/
+.python-version
 
-# Editor files
+# Build/editor files
+_build/
 .vscode/
 .idea/
+*~
+
+# Runtime/generated data
+threat_model_mitm/data/gateway/
+threat_model_mitm/data/cgm_packets_normal/
+
+# Runtime logs and evidence
+threat_model_mitm/src/machine1_cgm/logs/
+threat_model_mitm/src/machine2_gateway/logs/
+threat_model_mitm/src/machine3_attacker/logs/
+
+# Generated artefacts
+*.db
+*.log
+*.jsonl
+*.pcap
+*.pcapng
+
+# Dev Files
+/test
