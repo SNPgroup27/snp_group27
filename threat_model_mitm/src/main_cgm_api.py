@@ -7,7 +7,7 @@ Supports three run modes:
 
 Usage:
     python3 threat_model_mitm/src/main_cgm_api.py --mode single
-    python3 threat_model_mitm/src/main_cgm_api.py --mode cgm --gateway-ip 192.168.1.1
+    python3 threat_model_mitm/src/main_cgm_api.py --mode cgm --gateway-ip <gateway_ip_address>
     python3 threat_model_mitm/src/main_cgm_api.py --mode gateway
     python3 threat_model_mitm/src/main_cgm_api.py --mode single --interval 5
 """
@@ -78,7 +78,7 @@ def _load_runtime_config() -> dict[str, Any]:
     return {
         "gateway_host": gateway_config.get("host", DEFAULT_GATEWAY_HOST),
         "gateway_port": int(gateway_config.get("port", DEFAULT_GATEWAY_PORT)),
-        "gateway_debug": bool(gateway_config["debug"]),
+        "gateway_debug": bool(gateway_config.get("debug", False)),
         "reset_database_on_start": bool(gateway_config.get("reset_database_on_start", True)),
         "database_path": database_path,
         "interval_seconds": float(cgm_config.get("interval_seconds", DEFAULT_CGM_INTERVAL_SECONDS)),
@@ -210,7 +210,7 @@ def _parse_args(runtime_config: dict[str, Any]) -> argparse.Namespace:
         epilog=(
             "Examples:\n"
             "  python3 threat_model_mitm/src/main_cgm_api.py --mode single\n"
-            "  python3 threat_model_mitm/src/main_cgm_api.py --mode cgm --gateway-ip 192.168.1.1\n"
+            "  python3 threat_model_mitm/src/main_cgm_api.py --mode cgm --gateway-ip <gateway_ip_address>\n"
             "  python3 threat_model_mitm/src/main_cgm_api.py --mode gateway\n"
             "  python3 threat_model_mitm/src/main_cgm_api.py --mode single --interval 5\n"
             "  python3 threat_model_mitm/src/main_cgm_api.py --mode single --interval 0.1\n"
