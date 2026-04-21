@@ -6,7 +6,12 @@ from defence.captcha import (
     set_captcha_enabled,
     verify_challenge,
 )
-from defence.syn_cookies import read_tcp_syncookies, syn_cookies_kernel_status
+from defence.syn_defence import (
+    ingress_filtering_guidance,
+    read_rp_filter,
+    read_tcp_syncookies,
+    syn_cookies_kernel_status,
+)
 
 __all__ = [
     "create_challenge",
@@ -14,5 +19,7 @@ __all__ = [
     "captcha_enabled",
     "set_captcha_enabled",
     "read_tcp_syncookies",
+    "read_rp_filter",
+    "ingress_filtering_guidance",
     "syn_cookies_kernel_status",
 ]

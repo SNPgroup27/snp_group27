@@ -103,6 +103,7 @@ curl -s http://127.0.0.1:8000/api/appointments | python -m json.tool
 ### Defences (Coursework 2)
 
 - **SYN cookies (Linux kernel only):** not implemented in Python — run [`defence/syn_cookies.sh`](defence/syn_cookies.sh) on the **Linux server** (`sudo ./defence/syn_cookies.sh on`). Verify with `GET /api/defence/syn-cookies` or see [`defence/SYN_COOKIES.md`](defence/SYN_COOKIES.md).
+  Complementary ingress-filtering checks (`rp_filter`) are surfaced via `defence/syn_defence.py` in the same status endpoint.
 - **CAPTCHA on appointments:** toggle persisted state with `python defence/captcha.py --on` (or `--off`, `--status`) then run uvicorn; alternatively force with `ENABLE_APPOINTMENT_CAPTCHA=1` when starting uvicorn. Use `python iomt_client.py --use-captcha` for legitimate traffic. HTTP flood scripts that do not solve CAPTCHA will get **403**.
   When CAPTCHA defence is enabled, a built-in defence-only rate limiter also applies to appointment POSTs and returns `429` on bursts.
 

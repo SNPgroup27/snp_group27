@@ -16,7 +16,7 @@ from defence.captcha import (
     create_challenge,
     verify_challenge,
 )
-from defence.syn_cookies import syn_cookies_kernel_status
+from defence.syn_defence import syn_cookies_kernel_status
 
 _CAPTCHA_ENV = "ENABLE_APPOINTMENT_CAPTCHA"
 
