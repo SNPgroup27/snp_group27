@@ -154,8 +154,6 @@ class EvidenceLogger:
             "label_only_attempts": self._label_only,
             "value_only_attempts": self._value_only,
             "modification_rate": modification_rate,
-            "primary_threat": "LOW and HIGH alert suppression",
-            "primary_impact": "time-critical treatment delay",
             "tamper_policy_used": self._cfg.tamper_policy,
         }
 
