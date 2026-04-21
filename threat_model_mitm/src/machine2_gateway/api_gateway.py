@@ -1,8 +1,4 @@
-"""API Gateway: receives CGM readings, stores them in SQLite, logs abnormal alerts.
-
-Run directly from this folder with ``python3 api_gateway.py`` or prefer the
-launcher path: ``python3 ../main_cgm_api.py --mode gateway``.
-"""
+"""API gateway for CGM readings, SQLite storage, and abnormal-alert logging."""
 
 import json
 import logging

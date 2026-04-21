@@ -5,8 +5,6 @@ Packet files are derived from the GlucoBench benchmark dataset:
   - Glucose values converted from mg/dL to mmol/L.
   - Alert levels: LOW (<3.9 mmol/L), NORMAL (3.9-10.0), HIGH (>10.0).
   - Runtime packet timestamps are injected at send time.
-
-Launch the simulator via ``python3 ../main_cgm_api.py --mode cgm``.
 """
 
 import json
