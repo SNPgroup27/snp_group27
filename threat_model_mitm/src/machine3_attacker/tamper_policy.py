@@ -8,8 +8,7 @@ from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
-_SUPPORTED_ACTIONS = frozenset(("modify", "forward", "drop", "log_only"))
-
+_SUPPORTED_ACTIONS = frozenset(("modify", "forward_log", "drop"))
 
 @dataclass
 class TamperResult:
@@ -57,7 +56,7 @@ class TamperPolicy:
 
         if rule is None or not rule.get("enabled", True):
             return TamperResult(
-                action="forward",
+                action="no_policy_forward",
                 original_packet=dict(packet),
                 modified_packet=dict(packet),
                 changed_fields={},
@@ -67,7 +66,7 @@ class TamperPolicy:
 
         action = str(rule["action"])
 
-        if action in ("forward", "drop", "log_only"):
+        if action in ("forward_log", "drop"):
             return TamperResult(
                 action=action,
                 original_packet=dict(packet),
@@ -78,7 +77,6 @@ class TamperPolicy:
                 spoof_success_on_drop=bool(rule.get("spoof_success_on_drop", False)),
             )
 
-        # action == "modify": selectively change the supported clinical fields.
         modified = dict(packet)
         changed_fields: dict[str, dict[str, Any]] = {}
         new_glucose = rule.get("replacement_glucose_mmol")
