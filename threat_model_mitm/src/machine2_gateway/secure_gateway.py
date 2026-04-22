@@ -4,6 +4,7 @@ import json
 import logging
 import sqlite3
 import ssl
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ from flask import Flask, Response, jsonify, request
 
 from security_core.ai_ids import AnomalyDetector
 from security_core.e2e_crypto import decrypt_payload
+
 _BASE = Path(__file__).parent
 _CONFIG_FILE = _BASE / "config.json"
 _THREAT_MODEL_ROOT = _BASE.parents[1]
@@ -128,6 +130,17 @@ class SecureAPIGateway:
                 data = decrypt_payload(encrypted)
             except ValueError:
                 return jsonify({"status": "error", "message": "Decryption failed"}), 400
+
+            packet_timestamp_raw = data.get("timestamp")
+            if packet_timestamp_raw is None:
+                return jsonify({"status": "error", "message": "Missing: ['timestamp']"}), 400
+            try:
+                packet_epoch = _parse_iso_datetime(str(packet_timestamp_raw)).timestamp()
+            except ValueError:
+                return jsonify({"status": "error", "message": "Invalid timestamp"}), 400
+            if abs(time.time() - packet_epoch) > 10.0:
+                print("[!] REPLAY ATTACK DETECTED")
+                return jsonify({"error": "replay_protection_triggered"}), 403
 
             missing = [f for f in _REQUIRED_FIELDS if f not in data]
             if missing:
