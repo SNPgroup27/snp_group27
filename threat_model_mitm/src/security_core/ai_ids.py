@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest
+
 _WINDOW = 10
 _DEFAULT_DB = Path(__file__).resolve().parents[1] / "data" / "gateway" / "hospital.db"
 
@@ -47,13 +48,28 @@ class AnomalyDetector:
             return {"mitm_anomaly": False, "status": "insufficient_history", "windows": int(len(matrix))}
         model = IsolationForest(n_estimators=200, contamination=0.1, random_state=42)
         model.fit(matrix[:-1])
-        current = matrix[-1:].astype(np.float64)
+        latest_data = matrix[-1].astype(np.float64)
+        current = latest_data.reshape(1, -1)
         pred = int(model.predict(current)[0])
         score = float(model.decision_function(current)[0])
+        reason_text = ""
+        if pred == -1:
+            latency_mean = float(latest_data[0])
+            glucose_std = float(latest_data[2])
+            reasons: list[str] = []
+            if latency_mean > 50:
+                reasons.append("High Latency")
+            if glucose_std < 0.1:
+                reasons.append("Unnatural Glucose Variance (Tamper Signature)")
+            if not reasons:
+                reasons.append("General IsolationForest Outlier Pattern")
+            reason_text = ", ".join(reasons)
+            print(f"[IDS] Anomaly Reason: {reason_text}")
         return {
             "mitm_anomaly": pred == -1,
             "status": "ok",
             "isolation_forest_label": pred,
             "decision_function": score,
             "feature_vector": current[0].tolist(),
+            "anomaly_reason": reason_text,
         }
