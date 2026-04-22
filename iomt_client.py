@@ -12,6 +12,7 @@ import argparse
 import threading
 import time
 from dataclasses import dataclass, field
+from urllib.parse import urlparse
 
 import httpx
 
@@ -50,11 +51,13 @@ def run_worker(
     stats: WorkerStats,
     print_each: bool,
     use_captcha: bool,
+    source_ip: str | None,
 ) -> None:
     device_label = f"sim-appointments-client-{wid}"
     url = base_url.rstrip("/") + path
     base = base_url.rstrip("/")
-    with httpx.Client(timeout=timeout_s) as client:
+    transport = httpx.HTTPTransport(local_address=source_ip) if source_ip else httpx.HTTPTransport()
+    with httpx.Client(timeout=timeout_s, transport=transport) as client:
         while not stop.is_set():
             payload = dict(next_appointment())
             if use_captcha:
@@ -128,9 +131,26 @@ def main() -> None:
         action="store_true",
         help="Fetch /api/captcha/challenge before each POST (server needs ENABLE_APPOINTMENT_CAPTCHA=1)",
     )
+    p.add_argument(
+        "--source-ip",
+        default=None,
+        help=(
+            "Bind outgoing client connections to this local source IP "
+            "(must exist on this host/interface). If omitted and base-url host is 127.0.0.1, "
+            "client auto-binds to 127.0.0.2 for loopback demos."
+        ),
+    )
     args = p.parse_args()
 
     print_each = not args.quiet
+    # Loopback lab convenience: keep destination on 127.0.0.1 while giving
+    # the legit IoMT client a distinct source identity for firewall trust logic.
+    parsed = urlparse(args.base_url)
+    host = (parsed.hostname or "").strip()
+    effective_source_ip = args.source_ip
+    if effective_source_ip is None and host == "127.0.0.1":
+        effective_source_ip = "127.0.0.2"
+
     stop = threading.Event()
     stats = WorkerStats()
     threads = [
@@ -146,6 +166,7 @@ def main() -> None:
                 stats,
                 print_each,
                 args.use_captcha,
+                effective_source_ip,
             ),
             daemon=True,
         )
@@ -156,7 +177,7 @@ def main() -> None:
 
     print(
         "Fake IoMT client running. Each line is one POST of an appointment to the server.",
-        "Press Ctrl+C to stop.\n",
+        f"Source IP bind: {effective_source_ip or 'default route/interface'}. Press Ctrl+C to stop.\n",
         flush=True,
     )
 

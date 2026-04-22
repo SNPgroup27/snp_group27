@@ -13,6 +13,7 @@ import asyncio
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 
@@ -97,15 +98,24 @@ def main() -> None:
     p.add_argument(
         "--source-ip",
         default=None,
-        help="Optional local source IP to bind sockets (not spoofing).",
+        help=(
+            "Optional local source IP to bind sockets (not spoofing). "
+            "If omitted and --target host is 127.0.0.1, defaults to 127.0.0.3 (distinct from IoMT 127.0.0.2)."
+        ),
     )
     args = p.parse_args()
 
+    parsed = urlparse(args.target)
+    host = (parsed.hostname or "").strip()
+    effective_source = args.source_ip
+    if effective_source is None and host == "127.0.0.1":
+        effective_source = "127.0.0.3"
+
     print(
-        f"Starting HTTP flood (source_ip={args.source_ip or 'auto'}).",
+        f"Starting HTTP flood (source_ip={effective_source or 'auto'}).",
         flush=True,
     )
-    run_http_flood(args.target, args.path, args.concurrency, args.duration, args.source_ip)
+    run_http_flood(args.target, args.path, args.concurrency, args.duration, effective_source)
 
 
 if __name__ == "__main__":

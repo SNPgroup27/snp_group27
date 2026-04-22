@@ -2,32 +2,23 @@
 
 from __future__ import annotations
 
-import os
 import time
 from typing import Any, List
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
+from starlette.responses import JSONResponse
 
 from app.metrics import METRICS
 from defence.captcha import (
-    captcha_enabled,
+    captcha_debug_snapshot,
+    captcha_effective_enabled,
     check_rate_limit,
     create_challenge,
     verify_challenge,
 )
+from defence.http_firewall import http_firewall_status
 from defence.syn_defence import syn_cookies_kernel_status
-
-_CAPTCHA_ENV = "ENABLE_APPOINTMENT_CAPTCHA"
-
-
-def _captcha_enabled() -> bool:
-    env_val = os.environ.get(_CAPTCHA_ENV, "").strip().lower()
-    if env_val in ("1", "true", "yes", "on"):
-        return True
-    if env_val in ("0", "false", "no", "off"):
-        return False
-    return captcha_enabled()
 
 app = FastAPI(
     title="Simulated Hospital Datacenter",
@@ -67,6 +58,26 @@ async def timing_middleware(request: Request, call_next):
         raise
 
 
+@app.middleware("http")
+async def captcha_appointment_rate_gate(request: Request, call_next):
+    """Reject excess POSTs before the route (and body parsing) when CAPTCHA defence is on.
+
+    Registered after timing so this layer runs *first* on incoming requests (outer middleware).
+    """
+    if not captcha_effective_enabled() or request.method != "POST":
+        return await call_next(request)
+    if request.url.path != "/api/appointments":
+        return await call_next(request)
+    client_ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(client_ip):
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "rate limit exceeded (CAPTCHA defence active)"},
+            headers={"Connection": "close"},
+        )
+    return await call_next(request)
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "simulated-datacenter"}
@@ -83,6 +94,18 @@ async def syn_cookies_status():
     return syn_cookies_kernel_status()
 
 
+@app.get("/api/defence/http-firewall")
+async def http_fw_status():
+    """Network-level ``SNP_HTTP`` iptables chain for the API port (see ``defence.http_firewall``)."""
+    return http_firewall_status(8000)
+
+
+@app.get("/api/defence/captcha-status")
+async def captcha_status():
+    """Show CAPTCHA on/off as this server process sees it (env + persisted file path)."""
+    return captcha_debug_snapshot()
+
+
 @app.get("/api/captcha/challenge")
 async def captcha_challenge():
     """Return a one-time checkbox CAPTCHA token."""
@@ -92,11 +115,8 @@ async def captcha_challenge():
 @app.post("/api/appointments")
 async def post_appointment(appt: Appointment, request: Request):
     """Accept one appointment booking request."""
-    if _captcha_enabled():
-        client_ip = request.client.host if request.client else "unknown"
-        if not check_rate_limit(client_ip):
-            raise HTTPException(status_code=429, detail="rate limit exceeded")
-
+    if captcha_effective_enabled():
+        # Per-IP rate limit is enforced in `captcha_appointment_rate_gate` (before this handler).
         cid = appt.captcha_challenge_id
         ans = appt.captcha_answer
         if not cid or ans is None or str(ans).strip() == "":
