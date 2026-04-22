@@ -31,6 +31,11 @@ threat_model_mitm/src/machine1_cgm/logs/
 threat_model_mitm/src/machine2_gateway/logs/
 threat_model_mitm/src/machine3_attacker/logs/
 
+# Ignore mTLS Private Keys and Certificates
+threat_model_mitm/certs/*.key
+threat_model_mitm/certs/*.crt
+threat_model_mitm/certs/*.srl
+
 # Generated artefacts
 *.db
 *.log
