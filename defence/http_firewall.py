@@ -79,6 +79,25 @@ def _delete_input_jump(port: int, chain: str = _HTTP_FW_CHAIN) -> None:
         )
 
 
+def _insert_input_jump(port: int, chain: str = _HTTP_FW_CHAIN, position: int = 1) -> None:
+    """Insert INPUT jump near the top so earlier ACCEPT rules do not bypass it."""
+    subprocess.run(
+        [
+            "iptables",
+            "-I",
+            "INPUT",
+            str(position),
+            "-p",
+            "tcp",
+            "--dport",
+            str(port),
+            "-j",
+            chain,
+        ],
+        check=True,
+    )
+
+
 def _hashlimit_name(port: int, suffix: str) -> str:
     base = f"hf{port}{suffix}"[:15]
     return base if len(base) <= 15 else base[:15]
@@ -277,18 +296,7 @@ def http_rules_on(
         ]
     )
     _a(["-A", _HTTP_FW_CHAIN, "-j", "DROP"])
-    _a(
-        [
-            "-A",
-            "INPUT",
-            "-p",
-            "tcp",
-            "--dport",
-            str(port),
-            "-j",
-            _HTTP_FW_CHAIN,
-        ]
-    )
+    _insert_input_jump(port, _HTTP_FW_CHAIN, position=1)
     print(
         f"HTTP firewall ON: chain={_HTTP_FW_CHAIN} dport={port}; "
         f"~{established_pps} EST/REL pkt/s per source (burst~{e_burst}); "
@@ -349,10 +357,22 @@ def http_firewall_status(port: int = 8000) -> dict[str, object]:
         }
     r_in = subprocess.run(["iptables", "-S", "INPUT"], capture_output=True, text=True)
     jump = False
+    first_dport_rule: str | None = None
+    first_dport_targets_http_chain = False
     if r_in.stdout and _HTTP_FW_CHAIN in r_in.stdout:
         for line in r_in.stdout.splitlines():
-            if _HTTP_FW_CHAIN in line and f"--dport {port}" in line:
+            if f"--dport {port}" not in line:
+                continue
+            if first_dport_rule is None:
+                first_dport_rule = line
+                first_dport_targets_http_chain = _HTTP_FW_CHAIN in line
+            if _HTTP_FW_CHAIN in line:
                 jump = True
+    if first_dport_rule is None and r_in.stdout:
+        for line in r_in.stdout.splitlines():
+            if _HTTP_FW_CHAIN in line and f"--dport {port}" in line:
+                first_dport_rule = line
+                first_dport_targets_http_chain = True
                 break
     out = (r.stdout or "").strip()
     return {
@@ -361,6 +381,8 @@ def http_firewall_status(port: int = 8000) -> dict[str, object]:
         "port": port,
         "active": bool(jump) and out != "",
         "input_jump_to_chain": jump,
+        "first_input_rule_for_port": first_dport_rule,
+        "first_input_rule_hits_http_chain": first_dport_targets_http_chain,
         "chain_rules": out or None,
     }
 
