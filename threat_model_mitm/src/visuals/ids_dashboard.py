@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+
 _SRC = Path(__file__).resolve().parents[1]
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
@@ -47,7 +48,7 @@ latency_df = _load_latency(db_path)
 detector = AnomalyDetector(db_path)
 ids_state = detector.evaluate_current_state()
 if latency_df.empty:
-    st.info("No glucose rows yet — start the secure gateway and CGM simulator.")
+    st.info("No glucose rows yet - start the secure gateway and CGM simulator.")
 else:
     st.line_chart(latency_df.set_index("id")["latency_ms"])
 
