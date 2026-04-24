@@ -1,0 +1,7 @@
+{
+  "cgm_log": "../machine1_cgm/logs/cgm_sent_readings.log",
+  "gateway_db": "../../data/gateway/hospital.db",
+  "gateway_alert_log": "../machine2_gateway/logs/critical_alerts.log",
+  "attack_jsonl": "../machine3_attacker/logs/attack_packet_map.jsonl",
+  "attack_summary": "../machine3_attacker/logs/attack_summary.json"
+}

@@ -1,0 +1,5 @@
+{
+  "interval_seconds": 5,
+  "loop": true,
+  "packet_file": "../../data/cgm_packets_test/test_payload.json"
+}
