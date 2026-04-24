@@ -1,0 +1,62 @@
+[
+  {
+    "patient_id": "U001",
+    "device_id": "Medtronic_670G",
+    "glucose_mmol": 3.4,
+    "alert_level": "LOW"
+  },
+  {
+    "patient_id": "U001",
+    "device_id": "Medtronic_670G",
+    "glucose_mmol": 7.1,
+    "alert_level": "NORMAL"
+  },
+  {
+    "patient_id": "U001",
+    "device_id": "Medtronic_670G",
+    "glucose_mmol": 10.8,
+    "alert_level": "HIGH"
+  },
+  {
+    "patient_id": "U001",
+    "device_id": "Medtronic_670G",
+    "glucose_mmol": 3.7,
+    "alert_level": "LOW"
+  },
+  {
+    "patient_id": "U001",
+    "device_id": "Medtronic_670G",
+    "glucose_mmol": 6.4,
+    "alert_level": "NORMAL"
+  },
+  {
+    "patient_id": "U001",
+    "device_id": "Medtronic_670G",
+    "glucose_mmol": 11.0,
+    "alert_level": "HIGH"
+  },
+  {
+    "patient_id": "U001",
+    "device_id": "Medtronic_670G",
+    "glucose_mmol": 8.2,
+    "alert_level": "NORMAL"
+  },
+  {
+    "patient_id": "U001",
+    "device_id": "Medtronic_670G",
+    "glucose_mmol": 3.2,
+    "alert_level": "LOW"
+  },
+  {
+    "patient_id": "U001",
+    "device_id": "Medtronic_670G",
+    "glucose_mmol": 10.6,
+    "alert_level": "HIGH"
+  },
+  {
+    "patient_id": "U001",
+    "device_id": "Medtronic_670G",
+    "glucose_mmol": 5.9,
+    "alert_level": "NORMAL"
+  }
+]
