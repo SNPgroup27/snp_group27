@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -9,7 +8,7 @@ import pandas as pd
 from sklearn.ensemble import IsolationForest
 
 _WINDOW = 10
-_DEFAULT_DB = Path(__file__).resolve().parents[1] / "data" / "gateway" / "hospital.db"
+_DEFAULT_DB = Path(__file__).resolve().parents[2] / "data" / "gateway" / "hospital.db"
 
 
 class AnomalyDetector:
@@ -26,14 +25,12 @@ class AnomalyDetector:
         if len(frame) < _WINDOW:
             return np.asarray(rows, dtype=np.float64)
         for end in range(_WINDOW - 1, len(frame)):
-            window = frame.iloc[end - (_WINDOW - 1) : end + 1]
-            rows.append(
-                [
-                    float(window["latency_ms"].mean()),
-                    float(window["alert_mismatch"].sum()),
-                    float(window["glucose_mmol"].std(ddof=0)),
-                ]
-            )
+            window = frame.iloc[end - (_WINDOW - 1): end + 1]
+            rows.append([
+                float(window["latency_ms"].mean()),
+                float(window["alert_mismatch"].sum()),
+                float(window["glucose_mmol"].std(ddof=0)),
+            ])
         return np.asarray(rows, dtype=np.float64)
 
     def evaluate_current_state(self) -> dict[str, Any]:
@@ -64,7 +61,6 @@ class AnomalyDetector:
             if not reasons:
                 reasons.append("General IsolationForest Outlier Pattern")
             reason_text = ", ".join(reasons)
-            print(f"[IDS] Anomaly Reason: {reason_text}")
         return {
             "mitm_anomaly": pred == -1,
             "status": "ok",

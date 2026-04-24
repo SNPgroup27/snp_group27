@@ -4,6 +4,7 @@ import json
 import logging
 import sqlite3
 import ssl
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,11 +12,14 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
+_SRC = Path(__file__).resolve().parents[1]
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+
 from security_core.ai_ids import AnomalyDetector
 from security_core.e2e_crypto import decrypt_payload
 
 _BASE = Path(__file__).parent
-_CONFIG_FILE = _BASE / "config.json"
 _THREAT_MODEL_ROOT = _BASE.parents[1]
 _CERTS_DIR = _THREAT_MODEL_ROOT / "certs"
 _REQUIRED_FIELDS = ("patient_id", "timestamp", "glucose_mmol", "alert_level")
@@ -35,10 +39,8 @@ CREATE TABLE IF NOT EXISTS glucose_readings (
 );
 """
 
-
-def load_config(config_path: Path = _CONFIG_FILE) -> dict[str, Any]:
-    with open(config_path, "r", encoding="utf-8") as handle:
-        return json.load(handle)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+log = logging.getLogger("secure_gateway")
 
 
 def _parse_iso_datetime(value: str) -> datetime:
@@ -72,135 +74,130 @@ def _build_server_ssl_context(certs_dir: Path) -> ssl.SSLContext:
     return ctx
 
 
-class SecureAPIGateway:
-    def __init__(
-        self,
-        host: str = "0.0.0.0",
-        port: int = 5050,
-        db_path: Path = _BASE / "hospital.db",
-        debug: bool = False,
-        certs_dir: Path | None = None,
-    ) -> None:
-        self._host = host
-        self._port = port
-        self._db_path = Path(db_path).resolve()
-        self._debug = debug
-        self._certs_dir = Path(certs_dir) if certs_dir is not None else _CERTS_DIR
-        self._app = Flask(__name__)
-        self._detector = AnomalyDetector(self._db_path)
-        self._init_db()
-        self._register_routes()
+DB_PATH = _THREAT_MODEL_ROOT / "data" / "gateway" / "hospital.db"
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    @classmethod
-    def from_config(cls, config_path: Path = _CONFIG_FILE) -> "SecureAPIGateway":
-        cfg = load_config(config_path)
-        db_path = Path(cfg.get("database_path", "hospital.db"))
-        if not db_path.is_absolute():
-            db_path = (config_path.parent / db_path).resolve()
-        return cls(
-            host=str(cfg.get("host", "0.0.0.0")),
-            port=int(cfg.get("port", 5050)),
-            db_path=db_path,
-            debug=bool(cfg.get("debug", False)),
+
+def _db() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _init_db() -> None:
+    with _db() as conn:
+        conn.executescript(_SCHEMA)
+
+
+_init_db()
+detector = AnomalyDetector(DB_PATH)
+app = Flask(__name__)
+
+
+@app.route("/api/glucose", methods=["POST"])
+def receive_glucose() -> tuple[Response, int]:
+    encrypted = request.get_json(silent=True)
+    if not encrypted or not isinstance(encrypted, dict):
+        return jsonify({"status": "error", "message": "No JSON body"}), 400
+
+    try:
+        data = decrypt_payload(encrypted)
+        log.info("[CRYPTO] Decryption OK")
+    except ValueError:
+        log.warning("[CRYPTO] Decryption FAILED - possible tamper or wrong key")
+        return jsonify({"status": "error", "message": "Decryption failed"}), 400
+
+    packet_timestamp_raw = data.get("timestamp")
+    if packet_timestamp_raw is None:
+        return jsonify({"status": "error", "message": "Missing timestamp"}), 400
+    try:
+        packet_epoch = _parse_iso_datetime(str(packet_timestamp_raw)).timestamp()
+    except ValueError:
+        return jsonify({"status": "error", "message": "Invalid timestamp"}), 400
+
+    age = abs(time.time() - packet_epoch)
+    if age > 10.0:
+        log.warning("[REPLAY] REPLAY ATTACK DETECTED age=%.1fs", age)
+        return jsonify(
+            {"error": "replay_protection_triggered", "age_seconds": age}
+        ), 403
+    log.info("[REPLAY] Timestamp OK age=%.2fs", age)
+
+    missing = [f for f in _REQUIRED_FIELDS if f not in data]
+    if missing:
+        return jsonify({"status": "error", "message": f"Missing: {missing}"}), 400
+
+    received_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    try:
+        glucose_mmol = float(data["glucose_mmol"])
+        device_alert = str(data["alert_level"])
+        gateway_alert = _derive_alert_level(glucose_mmol)
+        alert_mismatch = int(device_alert != gateway_alert)
+        latency = _latency_ms(str(data["timestamp"]), received_at)
+        with _db() as conn:
+            cursor = conn.execute(
+                """INSERT INTO glucose_readings
+                   (patient_id, device_id, timestamp, glucose_mmol, device_alert_level,
+                    gateway_alert_level, alert_mismatch, received_at, latency_ms)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    str(data["patient_id"]),
+                    data.get("device_id"),
+                    str(data["timestamp"]),
+                    glucose_mmol,
+                    device_alert,
+                    gateway_alert,
+                    alert_mismatch,
+                    received_at,
+                    latency,
+                ),
+            )
+            row_id = int(cursor.lastrowid)
+    except (sqlite3.Error, ValueError) as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 500
+
+    ids_state = detector.evaluate_current_state()
+    if ids_state.get("mitm_anomaly"):
+        log.warning("[IDS] ANOMALY DETECTED: %s", ids_state.get("anomaly_reason"))
+    else:
+        log.info(
+            "[IDS] Traffic profile NORMAL score=%.4f",
+            ids_state.get("decision_function", 0),
         )
 
-    def _db(self) -> sqlite3.Connection:
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(self._db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+    log.info(
+        "[GW] stored id=%d patient=%s glucose=%.1f alert=%s mismatch=%d latency=%.1fms",
+        row_id,
+        data["patient_id"],
+        glucose_mmol,
+        gateway_alert,
+        alert_mismatch,
+        latency,
+    )
 
-    def _init_db(self) -> None:
-        with self._db() as conn:
-            conn.executescript(_SCHEMA)
+    return jsonify(
+        {
+            "status": "success",
+            "id": row_id,
+            "received_at": received_at,
+            "latency_ms": latency,
+            "ids": ids_state,
+        }
+    ), 200
 
-    def _invoke_ids_assume_breach(self) -> dict[str, Any]:
-        return self._detector.evaluate_current_state()
 
-    def _register_routes(self) -> None:
-        app = self._app
-
-        @app.route("/api/glucose", methods=["POST"])
-        def receive_glucose() -> tuple[Response, int]:
-            encrypted = request.get_json(silent=True)
-            if not encrypted or not isinstance(encrypted, dict):
-                return jsonify({"status": "error", "message": "No JSON body"}), 400
-
-            try:
-                data = decrypt_payload(encrypted)
-            except ValueError:
-                return jsonify({"status": "error", "message": "Decryption failed"}), 400
-
-            packet_timestamp_raw = data.get("timestamp")
-            if packet_timestamp_raw is None:
-                return jsonify({"status": "error", "message": "Missing: ['timestamp']"}), 400
-            try:
-                packet_epoch = _parse_iso_datetime(str(packet_timestamp_raw)).timestamp()
-            except ValueError:
-                return jsonify({"status": "error", "message": "Invalid timestamp"}), 400
-            if abs(time.time() - packet_epoch) > 10.0:
-                print("[!] REPLAY ATTACK DETECTED")
-                return jsonify({"error": "replay_protection_triggered"}), 403
-
-            missing = [f for f in _REQUIRED_FIELDS if f not in data]
-            if missing:
-                ids_state = self._invoke_ids_assume_breach()
-                return jsonify({"status": "error", "message": f"Missing: {missing}", "ids": ids_state}), 400
-
-            received_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
-            try:
-                glucose_mmol = float(data["glucose_mmol"])
-                device_alert = str(data["alert_level"])
-                gateway_alert = _derive_alert_level(glucose_mmol)
-                alert_mismatch = int(device_alert != gateway_alert)
-                latency_ms = _latency_ms(str(data["timestamp"]), received_at)
-                with self._db() as conn:
-                    cursor = conn.execute(
-                        """INSERT INTO glucose_readings
-                           (patient_id, device_id, timestamp, glucose_mmol, device_alert_level,
-                            gateway_alert_level, alert_mismatch, received_at, latency_ms)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (
-                            str(data["patient_id"]),
-                            data.get("device_id"),
-                            str(data["timestamp"]),
-                            glucose_mmol,
-                            device_alert,
-                            gateway_alert,
-                            alert_mismatch,
-                            received_at,
-                            latency_ms,
-                        ),
-                    )
-                    row_id = int(cursor.lastrowid)
-            except (sqlite3.Error, ValueError):
-                return jsonify({"status": "error", "message": "Storage/validation error"}), 500
-
-            # Assume breach: run IDS even when mTLS and decryption already succeeded.
-            ids_state = self._invoke_ids_assume_breach()
-            return jsonify(
-                {
-                    "status": "success",
-                    "id": row_id,
-                    "received_at": received_at,
-                    "latency_ms": latency_ms,
-                    "ids": ids_state,
-                }
-            ), 200
-
-        @app.route("/health", methods=["GET"])
-        def health() -> tuple[Response, int]:
-            return jsonify({"status": "ok", "service": "secure_gateway"}), 200
-
-    def run(self) -> None:
-        self._app.run(
-            host=self._host,
-            port=self._port,
-            debug=self._debug,
-            ssl_context=_build_server_ssl_context(self._certs_dir),
-        )
+@app.route("/health", methods=["GET"])
+def health() -> tuple[Response, int]:
+    return jsonify({"status": "ok", "service": "secure_gateway"}), 200
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    SecureAPIGateway.from_config(_CONFIG_FILE).run()
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 5051
+    use_tls = "--no-tls" not in sys.argv
+    if use_tls:
+        log.info("Starting SECURE gateway on port %d (mTLS)", port)
+        ssl_ctx = _build_server_ssl_context(_CERTS_DIR)
+        app.run(host="127.0.0.1", port=port, debug=False, ssl_context=ssl_ctx)
+    else:
+        log.info("Starting gateway on port %d (no TLS - test mode)", port)
+        app.run(host="127.0.0.1", port=port, debug=False)

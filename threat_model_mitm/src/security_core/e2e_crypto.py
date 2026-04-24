@@ -12,7 +12,9 @@ def _resolve_shared_secret() -> bytes:
     fallback = b"snpgroup27cw2demokey000000000000"
     env_value = os.environ.get("CGM_APP_SECRET_KEY")
     if not env_value:
-        print("[WARNING] CGM_APP_SECRET_KEY is not set. Falling back to insecure demo key.")
+        print(
+            "[WARNING] CGM_APP_SECRET_KEY is not set. Falling back to insecure demo key."
+        )
         return fallback
     raw = env_value.encode("utf-8")
     if len(raw) >= 32:
@@ -21,7 +23,9 @@ def _resolve_shared_secret() -> bytes:
 
 
 def encrypt_payload(data_dict: dict[str, Any]) -> dict[str, str]:
-    plaintext = json.dumps(data_dict, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    plaintext = json.dumps(data_dict, separators=(",", ":"), sort_keys=True).encode(
+        "utf-8"
+    )
     nonce = os.urandom(12)
     key = _resolve_shared_secret()
     ciphertext = AESGCM(key).encrypt(nonce, plaintext, associated_data=None)
@@ -35,7 +39,9 @@ def encrypt_payload(data_dict: dict[str, Any]) -> dict[str, str]:
 def decrypt_payload(encrypted_dict: dict[str, Any]) -> dict[str, Any]:
     try:
         nonce = base64.b64decode(str(encrypted_dict["nonce_b64"]), validate=True)
-        ciphertext = base64.b64decode(str(encrypted_dict["ciphertext_b64"]), validate=True)
+        ciphertext = base64.b64decode(
+            str(encrypted_dict["ciphertext_b64"]), validate=True
+        )
     except (KeyError, ValueError) as exc:
         raise ValueError("encrypted payload missing/corrupt fields") from exc
     key = _resolve_shared_secret()
